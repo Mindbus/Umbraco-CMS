@@ -49,16 +49,16 @@ namespace umbraco.DataLayer.SqlHelpers.SqlServer
         /// <returns>The return value of the command.</returns>
         protected override object ExecuteScalar(string commandText, SqlParameter[] parameters)
         {
-            #if DEBUG && DebugDataLayer
-                // Log Query Execution
-                Trace.TraceInformation(GetType().Name + " SQL ExecuteScalar: " + commandText);
+#if DEBUG && DebugDataLayer
+            // Log Query Execution
+            Trace.TraceInformation(GetType().Name + " SQL ExecuteScalar: " + commandText);
 #endif
 
             using (var cc = UseCurrentConnection)
             {
-                return cc.Transaction == null 
-                    ? SH.ExecuteScalar((SqlConnection) cc.Connection, CommandType.Text, commandText, parameters) 
-                    : SH.ExecuteScalar((SqlTransaction) cc.Transaction, CommandType.Text, commandText, parameters);
+                return cc.Transaction == null
+                    ? SH.ExecuteScalar((SqlConnection)cc.Connection, CommandType.Text, commandText, parameters)
+                    : SH.ExecuteScalar((SqlTransaction)cc.Transaction, CommandType.Text, commandText, parameters);
             }
         }
 
@@ -72,16 +72,16 @@ namespace umbraco.DataLayer.SqlHelpers.SqlServer
         /// </returns>
         protected override int ExecuteNonQuery(string commandText, params SqlParameter[] parameters)
         {
-            #if DEBUG && DebugDataLayer
-                // Log Query Execution
-                Trace.TraceInformation(GetType().Name + " SQL ExecuteNonQuery: " + commandText);
+#if DEBUG && DebugDataLayer
+            // Log Query Execution
+            Trace.TraceInformation(GetType().Name + " SQL ExecuteNonQuery: " + commandText);
 #endif
 
             using (var cc = UseCurrentConnection)
             {
                 return cc.Transaction == null
-                    ? SH.ExecuteNonQuery((SqlConnection) cc.Connection, CommandType.Text, commandText, parameters)
-                    : SH.ExecuteNonQuery((SqlTransaction) cc.Transaction, CommandType.Text, commandText, parameters);
+                    ? SH.ExecuteNonQuery((SqlConnection)cc.Connection, CommandType.Text, commandText, parameters)
+                    : SH.ExecuteNonQuery((SqlTransaction)cc.Transaction, CommandType.Text, commandText, parameters);
             }
         }
 
@@ -95,16 +95,65 @@ namespace umbraco.DataLayer.SqlHelpers.SqlServer
         /// </returns>
         protected override IRecordsReader ExecuteReader(string commandText, params SqlParameter[] parameters)
         {
-            #if DEBUG && DebugDataLayer
-                // Log Query Execution
-                Trace.TraceInformation(GetType().Name + " SQL ExecuteReader: " + commandText);
+#if DEBUG && DebugDataLayer
+            // Log Query Execution
+            Trace.TraceInformation(GetType().Name + " SQL ExecuteReader: " + commandText);
 #endif
 
             using (var cc = UseCurrentConnection)
             {
-                return cc.Transaction == null
-                    ? new SqlServerDataReader(SH.ExecuteReader((SqlConnection) cc.Connection, CommandType.Text, commandText, parameters))
-                    : new SqlServerDataReader(SH.ExecuteReader((SqlTransaction) cc.Transaction, CommandType.Text, commandText, parameters));
+                if (cc.Transaction == null)
+                {
+                    SqlConnection connection = null;
+
+                    if (cc.Connection is SqlConnection)
+                    {
+                        connection = (SqlConnection)cc.Connection;
+                    }
+                    else
+                    {
+                        var type = cc.Connection.GetType();
+                        var properties = type.GetProperties();
+                        
+                        foreach (var prop in properties)
+                        {
+                            var value = prop.GetValue(cc.Connection);
+                            if (value is SqlConnection)
+                            {
+                                connection = (SqlConnection) value;
+                                break;
+                            }
+                        }
+                    }
+
+                    return new SqlServerDataReader(SH.ExecuteReader(connection, CommandType.Text, commandText, parameters));
+                }
+                else
+                {
+                    SqlTransaction transaction = null;
+
+                    if (cc.Transaction is SqlTransaction)
+                    {
+                        transaction = (SqlTransaction)cc.Transaction;
+                    }
+                    else
+                    {
+                        var type = cc.Transaction.GetType();
+                        var properties = type.GetProperties();
+
+                        foreach (var prop in properties)
+                        {
+                            var value = prop.GetValue(cc.Transaction);
+                            if (value is SqlTransaction)
+                            {
+                                transaction = (SqlTransaction)value;
+                                break;
+                            }
+                        }
+                    }
+
+                    return new SqlServerDataReader(SH.ExecuteReader(transaction, CommandType.Text, commandText, parameters));
+                }
             }
         }
     }
